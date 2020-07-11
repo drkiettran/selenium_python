@@ -18,6 +18,8 @@ chrome_options.add_argument("--start-maximized")
 chrome_options.add_experimental_option('prefs', {
     'download.default_directory': download_dir,
 })
+tmp_dir = '/tmp/'
+extracted_dir = tmp_dir + artifact_name + '/'
 
 
 class SpringBootWebTestCase(unittest.TestCase):
@@ -28,7 +30,6 @@ class SpringBootWebTestCase(unittest.TestCase):
         self.driver = webdriver.Chrome(options=chrome_options)
         self.driver.implicitly_wait(5)
         self.driver.get(test_url)
-
 
     def tearDown(self):
         self.driver.quit()
@@ -109,7 +110,9 @@ class SpringBootWebTestCase(unittest.TestCase):
 
     def test_should_download_correct_spring_boot_project(self):
         self.test_should_receive_a_zip_file()
-        
+        self.process_zip_file()
+        self.assertTrue(self.it_is_a_maven_project())
+
     def it_takes_too_long(self, count):
         return count > 5
 
@@ -125,14 +128,26 @@ class SpringBootWebTestCase(unittest.TestCase):
         return True
 
     def process_zip_file(self):
-        tmp_dir = '/tmp/'
-        extracted_dir = tmp_dir + artifact_name + '/'
-
         if path.exists(extracted_dir):
             shutil.rmtree(extracted_dir)
 
         with zipfile.ZipFile(download_file, 'r') as zip_ref:
             zip_ref.extractall(tmp_dir)
+
+    def it_is_a_maven_project(self):
+        pom_file = extracted_dir + 'pom.xml'
+        tree = ET.parse(pom_file)
+        root = tree.getroot()
+        self.assertEqual('2.2.8.RELEASE', self.get_spring_boot_version(root))
+        return True
+
+    def get_spring_boot_version(self, root):
+        for child in root:
+            if 'parent' in child.tag:
+                for gchild in child:
+                    if 'version' in gchild.tag:
+                        return gchild.text
+
 
 if __name__ == '__main__':
     unittest.main()
